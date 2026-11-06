@@ -68,11 +68,13 @@ Click **Run** on an individual account or **Run pending** at the top to process 
 ## What Was Improved & Modified in This Version
 
 - **Redesigned Web UI**: Clean, responsive editorial light-mode interface built with Tailwind CSS, custom typography (*Instrument Serif*, *Schibsted Grotesk*, *Fragment Mono*), smooth animations, toast notifications, and live progress indicators.
-- **Account Editor**: Added inline account editing modal and `/api/accounts/update` endpoint to edit email, password, recovery email, 2FA secret, and proxy directly from the web dashboard.
+- **Manual CAPTCHA / Verification Pause & Resume**: Added a **Pause for CAPTCHA / Code** button next to the Live Log (`/api/pause` + `wait_if_paused()`) that freezes all bot navigation, clicks, and login retries so you can safely solve CAPTCHAs or enter verification codes without the bot refreshing or interrupting the page.
+- **Account Editor**: Added an inline account editing modal and `/api/accounts/update` endpoint to edit email, password (with Show/Hide toggle), recovery email, 2FA secret, and proxy directly from the web dashboard.
 - **English Localization**: Translated the web dashboard, backend API responses (`app.py`), and runtime logs/status messages (`automation_engine.py`) into English (with Indonesian documentation/workflow adjustments) while keeping page selectors intact for reliability.
 - **Bug Fixes**:
-  - Fixed Playwright CSS selector syntax crash on `gds.google.com` recovery prompts (`:text-is()` pseudo-class fix).
-  - Rewrote inline VCC form filling (`_fill_card_form` & `_type_and_verify`) to detect inputs by attributes rather than position, clear autofill leftovers, and verify every typed value against `config.json` before saving.
+  - **Playwright Selector Fix**: Fixed the `Unexpected token "="` CSS selector syntax crash on `gds.google.com` recovery prompts by replacing invalid mixed `text="..."` selectors with `:text-is()`.
+  - **Accurate VCC Auto-Fill & Verification**: Rebuilt inline Google Payments card filling (`_fill_card_form` & `_type_and_verify`) to prioritize the `instrumentmanager` iframe, check existing input values before clearing (preventing typed digits from being accidentally wiped), type sequentially (`vis.nth(0..4)`), and strictly verify every field (Card Number, `MMYY` Expiry, CVC, Cardholder, and `97201` ZIP) against `config.json` before clicking Save.
+  - **UI Dropdown Stability**: Fixed the account step selector dropdown closing on its own during live state polling.
 
 ---
 

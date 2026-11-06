@@ -85,6 +85,11 @@ class AccountActionReq(BaseModel):
     account_id: str
 
 
+class PauseReq(BaseModel):
+    account_id: Optional[str] = None
+    paused: Optional[bool] = None
+
+
 class AccountUpdateReq(BaseModel):
     account_id: str
     email: str
@@ -114,8 +119,10 @@ async def get_state():
             item["totp_now"] = "------"
         item["totp_rem"] = rem_sec
         item["is_running"] = acc["id"] in ACTIVE_TASKS
+        item["is_paused"] = bool(ACTIVE_TASKS[acc["id"]].paused) if acc["id"] in ACTIVE_TASKS else False
         accounts_out.append(item)
 
+    any_paused = any(t.paused for t in ACTIVE_TASKS.values())
     return {
         "target_region": cfg.get("target_region", "US"),
         "target_plan": cfg.get("target_plan", "pro_2year_zero"),
@@ -126,6 +133,7 @@ async def get_state():
         "logs": LOGS[-250:],
         "batch_running": BATCH_RUNNING,
         "active_count": len(ACTIVE_TASKS),
+        "any_paused": any_paused,
     }
 
 
@@ -420,6 +428,23 @@ async def run_batch(req: RunBatchReq):
 
     asyncio.create_task(_batch_runner())
     return {"ok": True, "queued": queue_ids}
+
+
+@app.post("/api/pause")
+async def toggle_pause(req: Optional[PauseReq] = None):
+    if not ACTIVE_TASKS:
+        raise HTTPException(status_code=400, detail="No running automation to pause")
+    targets = (
+        [ACTIVE_TASKS[req.account_id]]
+        if (req and req.account_id and req.account_id in ACTIVE_TASKS)
+        else list(ACTIVE_TASKS.values())
+    )
+    new_state = req.paused if (req and req.paused is not None) else (not any(t.paused for t in targets))
+    for t in targets:
+        t.paused = new_state
+    state_label = "⏸ Paused automation for manual captcha/verification" if new_state else "▶ Resumed automation"
+    append_log(f"[{time.strftime('%H:%M:%S')}] [PAUSE] {state_label}")
+    return {"ok": True, "paused": new_state}
 
 
 @app.post("/api/stop")

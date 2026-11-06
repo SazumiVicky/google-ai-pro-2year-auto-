@@ -257,9 +257,15 @@
     </section>
 
     <section class="pb-16 rise" style="--d:360ms">
-      <div class="flex flex-wrap items-end justify-between gap-2 border-b border-ink pb-3 mb-4">
-        <h2 class="sec-title flex items-center gap-3">Live log <span class="ping w-2 h-2 rounded-full bg-emerald-600 text-emerald-600"></span></h2>
-        <span class="text-xs text-mute">If a reCAPTCHA shows up while adding the card, tick the box and it continues.</span>
+      <div class="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-3 mb-4">
+        <div>
+          <h2 class="sec-title flex items-center gap-3">Live log <span class="ping w-2 h-2 rounded-full bg-emerald-600 text-emerald-600"></span></h2>
+          <p class="text-xs text-mute mt-1.5">Need to solve a CAPTCHA or enter a verification code? Pause the bot so it won't refresh or click away, then resume when done.</p>
+        </div>
+        <button id="btnPauseBot" onclick="togglePause()" class="btn btn-sm btn-line">
+          <span id="pauseDot" class="w-2 h-2 rounded-full bg-amber-600"></span>
+          <span id="pauseLabel">Pause for CAPTCHA / Code</span>
+        </button>
       </div>
       <div id="logTerminal" class="log border border-line rounded-xl p-4 h-80 overflow-y-auto font-mono text-[12px] leading-[1.75]"></div>
     </section>
@@ -382,6 +388,13 @@
         $('statDone').textContent = done;
         $('statRunning').textContent = running;
         $('summaryStats').textContent = `${total} total · ${done} done · ${running} running`;
+
+        const paused = !!data.any_paused;
+        const pBtn = $('btnPauseBot');
+        pBtn.disabled = running === 0;
+        pBtn.className = paused ? 'btn btn-sm btn-ink' : 'btn btn-sm btn-line';
+        $('pauseDot').className = paused ? 'ping w-2 h-2 rounded-full bg-emerald-400 text-emerald-400' : 'w-2 h-2 rounded-full bg-amber-600';
+        $('pauseLabel').textContent = paused ? 'Resume Automation' : 'Pause for CAPTCHA / Code';
       } catch (e) {
         console.error('State poll error:', e);
       }
@@ -654,6 +667,14 @@
     async function stopAll() {
       await fetch('/api/stop', { method: 'POST' });
       toast('Stopping all tasks');
+      fetchState();
+    }
+
+    async function togglePause() {
+      const res = await fetch('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      if (!res.ok) return toast(data.detail || 'No running task', 'red');
+      toast(data.paused ? 'Paused — complete CAPTCHA/code then click Resume' : 'Automation resumed', data.paused ? 'ink' : 'green');
       fetchState();
     }
 

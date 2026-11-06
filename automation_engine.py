@@ -484,6 +484,7 @@ class GoogleUltraAutomator:
         self.on_log = on_log or (lambda msg: print(msg))
         self.on_state = on_state or (lambda st: None)
         self.stop_requested = False
+        self.paused = False
         self.proc: Optional[subprocess.Popen] = None
         self.proxy_bridge: Optional[LocalHttpProxyAuthBridge] = None
 
@@ -536,11 +537,25 @@ class GoogleUltraAutomator:
         if self.stop_requested:
             raise RuntimeError("Task stopped manually by user")
 
+    async def wait_if_paused(self):
+        self.check_stop()
+        if not self.paused:
+            return
+        prev_status = self.account.get("status", "running")
+        prev_msg = self.account.get("step_message", "")
+        self.update_state(status="waiting_human", step_message="⏸ Paused for manual verification / captcha — click Resume when done")
+        self.log("⏸ Automation paused for manual verification / captcha. Waiting for you to click Resume...")
+        while self.paused:
+            self.check_stop()
+            await asyncio.sleep(0.5)
+        self.update_state(status=prev_status if prev_status != "waiting_human" else "running", step_message=prev_msg)
+        self.log("▶ Automation resumed!")
+
     async def safe_goto(self, page, url: str, timeout: int = 40000):
         """Navigate with automatic retry and residential proxy session rotation on transient network errors."""
         last_err = None
         for attempt in range(4):
-            self.check_stop()
+            await self.wait_if_paused()
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
                 return
@@ -569,7 +584,7 @@ class GoogleUltraAutomator:
         email = self.account.get("email", "")
         password = self.account.get("password", "")
         for _ in range(16):
-            self.check_stop()
+            await self.wait_if_paused()
             if page_obj.is_closed():
                 return
             try:
@@ -765,6 +780,7 @@ class GoogleUltraAutomator:
         await self.save_screenshot(page, "step1_init")
 
         for login_round in range(3):
+            await self.wait_if_paused()
             if "one.google.com" in page.url and "accounts.google.com" not in page.url and "gds.google.com" not in page.url:
                 break
             try:
@@ -823,6 +839,7 @@ class GoogleUltraAutomator:
 
             # Dismiss post-login prompts
             for _ in range(4):
+                await self.wait_if_paused()
                 if "one.google.com" in page.url and "gds.google.com" not in page.url:
                     break
                 btn = page.locator(
@@ -834,6 +851,7 @@ class GoogleUltraAutomator:
                 else:
                     break
 
+            await self.wait_if_paused()
             if "signin/identifier" in page.url or "ServiceLogin" in page.url:
                 if self.proxy_bridge:
                     self.proxy_bridge.rotate_session()
@@ -913,7 +931,6 @@ class GoogleUltraAutomator:
                     await asyncio.sleep(2.0)
 
     async def _type_and_verify(self, loc, value: str, label: str, digits_only: bool = True, attempts: int = 3) -> bool:
-        """Clear the input, type value, then read it back and compare. Retries on mismatch."""
         def norm(v: str) -> str:
             v = v or ""
             return re.sub(r"\D", "", v) if digits_only else v.strip().upper()
@@ -921,35 +938,37 @@ class GoogleUltraAutomator:
         expected = norm(value)
         for i in range(attempts):
             try:
+                await self.wait_if_paused()
+                cur = norm(await loc.input_value(timeout=1200))
+                if cur == expected and expected:
+                    return True
                 await loc.click(force=True)
                 await asyncio.sleep(0.15)
-                # Clear any autofilled / leftover value before typing
-                try:
-                    await loc.fill("")
-                except Exception:
-                    pass
-                await loc.press("Control+A")
-                await loc.press("Backspace")
-                await asyncio.sleep(0.1)
-                if i < attempts - 1:
-                    await loc.press_sequentially(value, delay=60)
-                else:
-                    await loc.fill(value)
+                if cur:
+                    await loc.press("Control+A")
+                    await loc.press("Backspace")
+                    await asyncio.sleep(0.15)
+                    if norm(await loc.input_value(timeout=1000)):
+                        await loc.evaluate("el => { el.value = ''; el.dispatchEvent(new Event('input', {bubbles: true})); }")
+                        await asyncio.sleep(0.15)
+                await loc.press_sequentially(value, delay=50)
                 await asyncio.sleep(0.35)
                 actual = norm(await loc.input_value(timeout=1500))
                 if actual == expected:
                     return True
-                self.log(f"⚠️ VCC field [{label}] mismatch (attempt {i + 1}), refilling...")
+                self.log(f"⚠️ VCC field [{label}] mismatch (got '{actual}', expected '{expected}', attempt {i + 1}), refilling...")
             except Exception as e:
                 self.log(f"⚠️ VCC field [{label}] fill error: {e}")
             await asyncio.sleep(0.4)
         return False
 
     async def _fill_card_form(self, tf, step_tag: str = "") -> bool:
-        """Fill the Google Payments add-card form strictly with the values from config.json.
-        Fields are detected by their attributes (autocomplete/name/aria-label/placeholder),
-        not by position, and every value is verified after typing."""
         tag = step_tag or "modal"
+        vis = tf.locator("input:visible")
+        cnt = await vis.count()
+        if cnt < 4:
+            return False
+
         cnum = re.sub(r"\D", "", self.card.get("number") or "")
         expm = re.sub(r"\D", "", str(self.card.get("exp_month") or "")).zfill(2)[-2:]
         expy = re.sub(r"\D", "", str(self.card.get("exp_year") or ""))[-2:]
@@ -957,80 +976,27 @@ class GoogleUltraAutomator:
         holder_v = (self.card.get("holder") or "CARD HOLDER").strip()
         zip_v = (self.card.get("postal_code") or "97201").strip()
 
-        roles = await tf.evaluate(
-            """() => {
-            const isVis = (el) => {
-                const r = el.getBoundingClientRect();
-                const s = getComputedStyle(el);
-                return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
-            };
-            const inputs = Array.from(document.querySelectorAll('input')).filter(el =>
-                isVis(el) && !['hidden', 'checkbox', 'radio', 'submit', 'button'].includes((el.type || '').toLowerCase()));
-            inputs.forEach(el => el.removeAttribute('data-vcc-role'));
-            const desc = (el) => {
-                let lbl = '';
-                if (el.id) { const l = document.querySelector('label[for="' + el.id + '"]'); if (l) lbl = l.innerText; }
-                return [el.autocomplete, el.name, el.id, el.getAttribute('aria-label'), el.placeholder, lbl]
-                    .filter(Boolean).join(' ').toLowerCase();
-            };
-            const rules = [
-                ['number', /cc-number|cardnumber|card number|card-number|卡号|cardnum/],
-                ['cvc', /cc-csc|cvc|cvv|security code|安全码|csc/],
-                ['exp_month', /cc-exp-month|exp.?month|到期月|expmonth/],
-                ['exp_year', /cc-exp-year|exp.?year|到期年|expyear/],
-                ['exp', /cc-exp|expir|mm.?\\/.?yy|有效期|到期/],
-                ['name', /cc-name|cardholder|name on card|持卡人|姓名|name/],
-                ['zip', /postal|zip|邮编|邮政编码/],
-            ];
-            const used = new Set();
-            const found = {};
-            for (const el of inputs) {
-                const d = desc(el);
-                for (const [role, re] of rules) {
-                    if (found[role] || used.has(el)) continue;
-                    if (re.test(d)) { el.setAttribute('data-vcc-role', role); found[role] = true; used.add(el); break; }
-                }
-            }
-            // Positional fallback (number, exp, cvc, name, zip) only if nothing was recognised
-            if (!found.number) {
-                const order = ['number', 'exp', 'cvc', 'name', 'zip'];
-                inputs.forEach(el => el.removeAttribute('data-vcc-role'));
-                const res = {};
-                inputs.slice(0, 5).forEach((el, i) => { el.setAttribute('data-vcc-role', order[i]); res[order[i]] = true; });
-                res._fallback = true;
-                return res;
-            }
-            return found;
-        }"""
-        )
-        if not roles or not roles.get("number"):
-            return False
-        if roles.get("_fallback"):
-            fr_url = tf.url or ""
-            if "instrumentmanager" not in fr_url and "payments" not in fr_url:
-                return False
-            self.log(f"[{tag}] ⚠️ Could not detect card fields by attributes, filling by position")
+        ok = await self._type_and_verify(vis.nth(0), cnum, "card number")
+        await asyncio.sleep(0.25)
+        ok &= await self._type_and_verify(vis.nth(1), f"{expm}{expy}", "expiry")
+        await asyncio.sleep(0.25)
+        ok &= await self._type_and_verify(vis.nth(2), cvc_v, "CVC")
+        await asyncio.sleep(0.25)
 
-        def L(role):
-            return tf.locator(f'[data-vcc-role="{role}"]').first
+        try:
+            cur_name = (await vis.nth(3).input_value(timeout=1000)).strip()
+            if not cur_name or cur_name.upper() != holder_v.upper():
+                await self._type_and_verify(vis.nth(3), holder_v, "cardholder", digits_only=False)
+        except Exception:
+            pass
 
-        ok = await self._type_and_verify(L("number"), cnum, "card number")
-        if roles.get("exp_month") and roles.get("exp_year"):
-            ok &= await self._type_and_verify(L("exp_month"), expm, "exp month")
-            ok &= await self._type_and_verify(L("exp_year"), expy, "exp year")
-        elif roles.get("exp"):
-            ok &= await self._type_and_verify(L("exp"), f"{expm}{expy}", "expiry")
-        if roles.get("cvc"):
-            ok &= await self._type_and_verify(L("cvc"), cvc_v, "CVC")
-        if roles.get("name"):
-            await self._type_and_verify(L("name"), holder_v, "cardholder", digits_only=False)
-        if roles.get("zip"):
-            await self._type_and_verify(L("zip"), zip_v, "zip", digits_only=False)
+        if cnt >= 5:
+            await self._type_and_verify(vis.nth(4), zip_v, "zip", digits_only=False)
 
         if not ok:
-            self.log(f"[{tag}] ❌ VCC still does not match config.json after retries, skipping save")
+            self.log(f"[{tag}] ❌ VCC did not match config.json, retrying...")
             return False
-        self.log(f"[{tag}] ✅ VCC filled from config.json and verified (ending {cnum[-4:]}, {expm}/{expy})")
+        self.log(f"[{tag}] ✅ VCC filled and verified (ending {cnum[-4:]}, {expm}/{expy})")
         return True
 
     async def _poll_eacquire_modal(self, page, max_loops: int = 55, step_tag: str = ""):
@@ -1039,7 +1005,7 @@ class GoogleUltraAutomator:
         inline_card_saved = False
         while loops_left > 0:
             loops_left -= 1
-            self.check_stop()
+            await self.wait_if_paused()
             if "accounts.google.com" in page.url or "gds.google.com" in page.url:
                 self.log(f"[{step_tag or 'modal'}] Redirected to sign-in verification ({page.url[:60]}), verifying automatically...")
                 await self.pass_reauth_on_page(page)
@@ -1099,6 +1065,7 @@ class GoogleUltraAutomator:
                                     }"""
                                     )
                                     for _ in range(20):
+                                        await self.wait_if_paused()
                                         await asyncio.sleep(1.0)
                                         all_frames = list(page.frames)
                                         # Prefer the Google Payments instrument-manager frame over any other frame
@@ -1123,6 +1090,7 @@ class GoogleUltraAutomator:
                                                         )
                                                     self.log(f"[{step_tag or 'modal'}] ✅ Clicked Save card, waiting for Google Play confirmation...")
                                                     for _w in range(22):
+                                                        await self.wait_if_paused()
                                                         await asyncio.sleep(1.0)
                                                         still_im = any("instrumentmanager" in (f.url or "") for f in page.frames)
                                                         if not still_im:
@@ -1358,6 +1326,7 @@ class GoogleUltraAutomator:
         acct_pwd = self.account.get("password", "")
         post_click_err = None
         for wait_i in range(35):
+            await self.wait_if_paused()
             await asyncio.sleep(2)
             if len(page.context.pages) > 1:
                 await self.pass_reauth_on_page(page.context.pages[-1])
