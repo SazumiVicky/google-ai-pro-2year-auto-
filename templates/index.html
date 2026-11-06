@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Pro · 24 Months Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Instrument Serif"', 'serif'],
+            sans: ['"Schibsted Grotesk"', 'sans-serif'],
+            mono: ['"Fragment Mono"', 'monospace']
+          },
+          colors: {
+            paper: '#f7f5f0',
+            ink: '#16140f',
+            line: '#e2ddd2',
+            mute: '#7d776b',
+            accent: '#c2410c'
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    .field { @apply w-full bg-transparent border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-mute/50 outline-none transition-colors duration-200 hover:border-mute/50 focus:border-ink; }
+    .lbl { @apply block text-[11px] font-medium uppercase tracking-[0.14em] text-mute mb-1.5; }
+    .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none whitespace-nowrap; }
+    .btn-ink { @apply bg-ink text-paper hover:bg-ink/85; }
+    .btn-line { @apply border border-line text-ink hover:border-ink; }
+    .btn-red { @apply border border-red-200 text-red-700 hover:border-red-500; }
+    .btn-sm { @apply px-2.5 py-1.5 text-xs rounded-md; }
+    .sec-title { @apply font-display text-2xl sm:text-3xl text-ink leading-none; }
+  </style>
+  <style>
+    body { font-feature-settings: "ss01", "cv11"; }
+    ::selection { background: #16140f; color: #f7f5f0; }
+    .rise { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
+    @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    .row-in { animation: rowin .5s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes rowin { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+    .draw path { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 1.2s .6s cubic-bezier(.6,0,.2,1) forwards; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    .ping { position: relative; }
+    .ping::after { content: ""; position: absolute; inset: 0; border-radius: 9999px; background: currentColor; animation: ping 1.6s cubic-bezier(0,0,.2,1) infinite; }
+    @keyframes ping { 75%, 100% { transform: scale(2.4); opacity: 0; } }
+    .seg-active { background: linear-gradient(90deg, #c2410c 0%, #f59e0b 50%, #c2410c 100%); background-size: 200% 100%; animation: flow 1.4s linear infinite; }
+    @keyframes flow { to { background-position: -200% 0; } }
+    .modal-in { animation: modal .35s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes modal { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+    .toast-in { animation: toast .4s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes toast { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .log::-webkit-scrollbar { width: 8px; }
+    .log::-webkit-scrollbar-thumb { background: #e2ddd2; border-radius: 8px; }
+    .step-card { transition: border-color .3s, transform .3s; }
+    .step-card:hover { border-color: #16140f; transform: translateY(-2px); }
+    .step-card:hover .step-num { color: #c2410c; }
+  </style>
+</head>
+<body class="bg-paper text-ink font-sans antialiased min-h-screen">
+
+  <header class="sticky top-0 z-40 bg-paper/85 backdrop-blur border-b border-line">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full border border-ink grid place-items-center font-display italic text-lg leading-none">p</div>
+        <div class="leading-tight">
+          <div class="font-semibold text-sm">AI Pro <span class="text-mute font-normal">/ 24 months</span></div>
+          <div class="text-[11px] text-mute font-mono">zero-cost automation</div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-red" onclick="stopAll()">
+        <span class="w-2 h-2 rounded-sm bg-current"></span>Stop all
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6">
+
+    <section class="pt-12 sm:pt-16 pb-10 grid lg:grid-cols-[1.4fr_1fr] gap-10 items-end">
+      <div>
+        <p class="rise font-mono text-xs text-mute mb-5" style="--d:0ms">US tax-free · ZIP 97201 · Oregon</p>
+        <h1 class="rise font-display text-5xl sm:text-6xl lg:text-7xl leading-[0.95] tracking-tight" style="--d:80ms">
+          Two years of<br />Google AI Pro, for
+          <span class="relative inline-block italic">
+            $0.00
+            <svg class="draw absolute left-0 -bottom-2 w-full" viewBox="0 0 200 14" fill="none" preserveAspectRatio="none"><path d="M3 9c40-6 90-8 194-3" stroke="#c2410c" stroke-width="3" stroke-linecap="round"/></svg>
+          </span>
+        </h1>
+        <p class="rise mt-6 max-w-xl text-mute leading-relaxed" style="--d:160ms">
+          Works with regular and 2FA accounts. Signs in, stacks three free layers up to 24 months, then cancels auto-renew on Google Play so you are never charged.
+        </p>
+      </div>
+
+      <div class="rise" style="--d:240ms">
+        <div class="grid grid-cols-3 border-y border-line divide-x divide-line mb-5">
+          <div class="py-4 pr-4">
+            <div id="statTotal" class="font-display text-4xl leading-none">0</div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-mute mt-2">Accounts</div>
+          </div>
+          <div class="py-4 px-4">
+            <div id="statDone" class="font-display text-4xl leading-none text-emerald-700">0</div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-mute mt-2">Completed</div>
+          </div>
+          <div class="py-4 pl-4">
+            <div id="statRunning" class="font-display text-4xl leading-none text-accent">0</div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-mute mt-2">Running</div>
+          </div>
+        </div>
+        <label class="lbl">Start queue from</label>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <select id="batchStartStep" class="field">
+            <option value="1">Step 1 · Full run + cancel</option>
+            <option value="2">Step 2 · Signed in, run all 3 layers</option>
+            <option value="3">Step 3 · Have 12M, run layer 2 + 3</option>
+            <option value="4">Step 4 · Have 18M, final layer + cancel</option>
+            <option value="5">Step 5 · Only cancel auto-renew</option>
+          </select>
+          <button class="btn btn-ink" id="btnBatchRun" onclick="runBatch()">Run pending
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-3 pb-14">
+      <div class="step-card rise border border-line rounded-xl p-4" style="--d:300ms">
+        <div class="step-num font-mono text-xs text-mute transition-colors">01</div>
+        <div class="font-semibold mt-3">Sign in</div>
+        <div class="text-xs text-mute mt-1 leading-relaxed">Email, password, recovery email or 2FA code.</div>
+      </div>
+      <div class="step-card rise border border-line rounded-xl p-4" style="--d:360ms">
+        <div class="step-num font-mono text-xs text-mute transition-colors">02</div>
+        <div class="font-semibold mt-3">12 months free</div>
+        <div class="text-xs text-mute mt-1 leading-relaxed">Pro 5 TB + YT trial. Adds card inline if needed.</div>
+      </div>
+      <div class="step-card rise border border-line rounded-xl p-4" style="--d:420ms">
+        <div class="step-num font-mono text-xs text-mute transition-colors">03</div>
+        <div class="font-semibold mt-3">+6 months</div>
+        <div class="text-xs text-mute mt-1 leading-relaxed">S25 Pro offer stacked up to 18 months.</div>
+      </div>
+      <div class="step-card rise border border-line rounded-xl p-4" style="--d:480ms">
+        <div class="step-num font-mono text-xs text-mute transition-colors">04</div>
+        <div class="font-semibold mt-3">+6 months</div>
+        <div class="text-xs text-mute mt-1 leading-relaxed">Pixel offer, capped at 24 months.</div>
+      </div>
+      <div class="step-card rise border border-line rounded-xl p-4 col-span-2 md:col-span-1" style="--d:540ms">
+        <div class="step-num font-mono text-xs text-mute transition-colors">05</div>
+        <div class="font-semibold mt-3">Cancel renew</div>
+        <div class="text-xs text-mute mt-1 leading-relaxed">Cancels on Play Store with screenshot proof.</div>
+      </div>
+    </section>
+
+    <section class="grid lg:grid-cols-[1.35fr_1fr] gap-12 pb-16">
+      <div class="rise" style="--d:200ms">
+        <div class="flex items-end justify-between border-b border-ink pb-3 mb-6">
+          <h2 class="sec-title">Configuration</h2>
+          <button class="btn btn-sm btn-ink" id="btnSave" onclick="saveConfig(true)">Save</button>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="lbl">Region</label>
+            <select id="cfgTargetRegion" class="field" onchange="onRegionChange(this.value)">
+              <option value="US">United States · USD · Oregon 97201</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Plan</label>
+            <select id="cfgTargetPlan" class="field">
+              <option value="pro_2year_zero">Google AI Pro 5 TB · 24 months · $0.00</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="font-mono text-xs text-mute mt-8 mb-4">— Card, used only for the $0.00 trial check</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="col-span-2">
+            <label class="lbl">Card number</label>
+            <input type="text" id="cfgCardNumber" class="field font-mono tracking-wider" placeholder="4242 4242 4242 4242" inputmode="numeric" />
+          </div>
+          <div>
+            <label class="lbl">Expiry</label>
+            <div class="flex gap-2">
+              <input type="text" id="cfgExpMonth" class="field font-mono text-center" placeholder="MM" maxlength="2" inputmode="numeric" />
+              <input type="text" id="cfgExpYear" class="field font-mono text-center" placeholder="YY" maxlength="4" inputmode="numeric" />
+            </div>
+          </div>
+          <div>
+            <label class="lbl">CVC</label>
+            <input type="text" id="cfgCvc" class="field font-mono text-center" placeholder="123" maxlength="4" inputmode="numeric" />
+          </div>
+          <div class="col-span-2">
+            <label class="lbl">Cardholder</label>
+            <input type="text" id="cfgHolder" class="field uppercase" placeholder="JOHN DOE" />
+          </div>
+          <div class="col-span-2">
+            <label class="lbl">Billing address</label>
+            <input type="text" id="cfgAddr" class="field" placeholder="700 SW 5th Ave" />
+          </div>
+          <div>
+            <label class="lbl">ZIP</label>
+            <input type="text" id="cfgZip" class="field font-mono" placeholder="97201" />
+          </div>
+          <div>
+            <label class="lbl">State</label>
+            <input type="text" id="cfgProvince" class="field font-mono uppercase" placeholder="OR" />
+          </div>
+        </div>
+
+        <p class="font-mono text-xs text-mute mt-8 mb-4">— Network</p>
+        <label class="lbl">Proxy template</label>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input type="text" id="cfgProxyTemplate" class="field font-mono" placeholder="Empty = use this machine's network, or http://user:pass@host:port" />
+          <button type="button" class="btn btn-line" onclick="testProxyNow()" id="btnTestProxy">Test proxy</button>
+        </div>
+        <div id="proxyTestResult" class="text-xs mt-2 text-emerald-700">Using this machine's network by default (ZIP 97201, $0.00 on all layers).</div>
+
+        <label class="mt-8 flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" id="cfgAutoCancel" class="peer sr-only" checked />
+          <span class="mt-0.5 w-9 h-5 shrink-0 rounded-full border border-line peer-checked:border-ink peer-checked:bg-ink relative transition-colors duration-300 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:w-3 after:h-3 after:rounded-full after:bg-mute/60 after:transition-all after:duration-300 peer-checked:after:translate-x-4 peer-checked:after:bg-paper"></span>
+          <span class="text-sm leading-relaxed">
+            <span class="font-medium">Auto-cancel after stacking</span>
+            <span class="block text-mute text-xs mt-0.5">Goes to Google Play right after reaching 24 months and turns off auto-renew, so nothing is ever charged.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="rise flex flex-col" style="--d:280ms">
+        <div class="flex items-end justify-between border-b border-ink pb-3 mb-6">
+          <h2 class="sec-title">Import</h2>
+          <button class="btn btn-sm btn-ink" onclick="importAccounts()">Add accounts</button>
+        </div>
+        <textarea
+          id="importText"
+          class="field font-mono text-xs leading-relaxed flex-1 min-h-[260px] resize-none"
+          placeholder="One account per line. Any separator works: ----  /  —  |  space&#10;&#10;email----password----recovery@mail.com&#10;email/password/recovery/2FA_SECRET&#10;email—password—recovery@mail.com&#10;email----password----2FA_SECRET"
+        ></textarea>
+        <p class="text-xs text-mute mt-3">Recovery email and 2FA secret are detected automatically.</p>
+      </div>
+    </section>
+
+    <section class="pb-16 rise" style="--d:320ms">
+      <div class="flex flex-wrap items-end justify-between gap-2 border-b border-ink pb-3">
+        <h2 class="sec-title">Queue</h2>
+        <span id="summaryStats" class="text-xs text-mute font-mono">Loading…</span>
+      </div>
+      <div class="hidden lg:grid grid-cols-[minmax(0,1.6fr)_140px_130px_minmax(0,1.6fr)_150px] gap-6 py-3 border-b border-line text-[11px] uppercase tracking-[0.14em] text-mute">
+        <div>Account</div><div>Verification</div><div>Status</div><div>Progress</div><div>Expires</div>
+      </div>
+      <div id="accountsTbody"></div>
+    </section>
+
+    <section class="pb-16 rise" style="--d:360ms">
+      <div class="flex flex-wrap items-end justify-between gap-2 border-b border-ink pb-3 mb-4">
+        <h2 class="sec-title flex items-center gap-3">Live log <span class="ping w-2 h-2 rounded-full bg-emerald-600 text-emerald-600"></span></h2>
+        <span class="text-xs text-mute">If a reCAPTCHA shows up while adding the card, tick the box and it continues.</span>
+      </div>
+      <div id="logTerminal" class="log border border-line rounded-xl p-4 h-80 overflow-y-auto font-mono text-[12px] leading-[1.75]"></div>
+    </section>
+  </main>
+
+  <footer class="border-t border-line">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm">
+      <div class="text-mute leading-relaxed">
+        Original source by
+        <a href="https://github.com/worldonlyu" target="_blank" class="text-ink underline decoration-line underline-offset-4 hover:decoration-accent transition-colors">worldonlyu</a>
+        —
+        <a href="https://github.com/worldonlyu/Google_AI_Pro_2Year_ZeroCost_Auto" target="_blank" class="text-ink underline decoration-line underline-offset-4 hover:decoration-accent transition-colors">Google_AI_Pro_2Year_ZeroCost_Auto</a>
+      </div>
+      <div class="text-mute">
+        English version, fixes &amp; bug repairs by <span class="font-display italic text-lg text-ink">Sazumi Viki</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="imgModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/40 backdrop-blur-sm" onclick="closeModal()">
+    <div id="modalBox" class="bg-paper border border-line rounded-xl max-w-5xl w-full max-h-[90vh] overflow-auto p-4" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between gap-4 mb-3">
+        <strong id="modalTitle" class="text-sm font-medium truncate">Screenshot</strong>
+        <button class="btn btn-sm btn-line" onclick="closeModal()">Close</button>
+      </div>
+      <img id="modalImg" src="" alt="screenshot" class="w-full rounded-lg border border-line" />
+    </div>
+  </div>
+
+  <div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-ink/40 backdrop-blur-sm" onclick="closeEdit()">
+    <form id="editBox" class="bg-paper border border-line rounded-xl w-full max-w-lg p-6" onclick="event.stopPropagation()" onsubmit="saveEdit(event)">
+      <div class="flex items-end justify-between border-b border-ink pb-3 mb-5">
+        <h3 class="font-display text-3xl leading-none">Edit account</h3>
+        <span id="editId" class="font-mono text-xs text-mute"></span>
+      </div>
+      <div class="grid gap-4">
+        <div>
+          <label class="lbl">Email</label>
+          <input type="email" id="editEmail" class="field" required />
+        </div>
+        <div>
+          <label class="lbl">Password</label>
+          <div class="relative">
+            <input type="password" id="editPassword" class="field font-mono pr-16" required />
+            <button type="button" onclick="togglePw()" id="editPwToggle" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-mute hover:text-ink transition-colors">Show</button>
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="lbl">Recovery email</label>
+            <input type="email" id="editRecovery" class="field" placeholder="optional" />
+          </div>
+          <div>
+            <label class="lbl">2FA secret</label>
+            <input type="text" id="editTotp" class="field font-mono" placeholder="optional" />
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Proxy</label>
+          <input type="text" id="editProxy" class="field font-mono" placeholder="optional · http://user:pass@host:port" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-6">
+        <button type="button" class="btn btn-line" onclick="closeEdit()">Cancel</button>
+        <button type="submit" class="btn btn-ink" id="editSave">Save changes</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50"></div>
+
+  <script>
+    let configInitialized = false;
+    let selectedStartSteps = {};
+    let copiedAccountMap = {};
+    let openedBrowserMap = {};
+    let seenRows = new Set();
+    let accountMap = {};
+    let editingId = null;
+    const $ = id => document.getElementById(id);
+
+    function toast(msg, tone = 'ink') {
+      const colors = { ink: 'border-ink', red: 'border-red-500 text-red-700', green: 'border-emerald-600 text-emerald-700' };
+      $('toast').innerHTML = `<div class="toast-in bg-paper border ${colors[tone]} rounded-lg px-4 py-2.5 text-sm max-w-[90vw]">${escapeHtml(msg)}</div>`;
+      clearTimeout(toast.t);
+      toast.t = setTimeout(() => $('toast').innerHTML = '', 3200);
+    }
+
+    async function fetchState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+
+        if (!configInitialized) {
+          $('cfgTargetRegion').value = data.target_region || 'US';
+          $('cfgTargetPlan').value = data.target_plan || 'pro_2year_zero';
+          $('cfgAutoCancel').checked = data.auto_cancel !== false;
+          $('cfgProxyTemplate').value = data.proxy_template || '';
+          const c = data.card || {};
+          $('cfgCardNumber').value = c.number || '';
+          $('cfgExpMonth').value = c.exp_month || '';
+          $('cfgExpYear').value = c.exp_year || '';
+          $('cfgCvc').value = c.cvc || '';
+          $('cfgHolder').value = c.holder || '';
+          $('cfgAddr').value = c.address_line1 || '700 SW 5th Ave';
+          $('cfgZip').value = c.postal_code || '97201';
+          $('cfgProvince').value = c.province || 'OR';
+          configInitialized = true;
+        }
+
+        const accounts = data.accounts || [];
+        accountMap = Object.fromEntries(accounts.map(a => [a.id, a]));
+        renderAccounts(accounts);
+        renderLogs(data.logs || []);
+
+        const total = accounts.length;
+        const done = accounts.filter(a => a.status === 'completed').length;
+        const running = data.active_count || 0;
+        $('statTotal').textContent = total;
+        $('statDone').textContent = done;
+        $('statRunning').textContent = running;
+        $('summaryStats').textContent = `${total} total · ${done} done · ${running} running`;
+      } catch (e) {
+        console.error('State poll error:', e);
+      }
+    }
+
+    function statusBadgeHtml(status) {
+      const map = {
+        pending: ['text-mute', 'border-line', 'Pending', false],
+        running: ['text-blue-700', 'border-blue-200', 'Running', true],
+        waiting_human: ['text-amber-700', 'border-amber-300', 'Needs you', true],
+        completed: ['text-emerald-700', 'border-emerald-200', 'Completed', false],
+        error: ['text-red-700', 'border-red-200', 'Error', false],
+        stopped: ['text-mute', 'border-line', 'Stopped', false]
+      };
+      const [txt, bd, label, live] = map[status] || ['text-mute', 'border-line', status, false];
+      return `<span class="inline-flex items-center gap-2 border ${bd} ${txt} rounded-full px-2.5 py-1 text-xs font-medium">
+        <span class="${live ? 'ping' : ''} w-1.5 h-1.5 rounded-full bg-current"></span>${label}</span>`;
+    }
+
+    function stepDotsHtml(curStep, status) {
+      const names = ['Sign in', '12M', '+6M', '+6M', 'Cancel'];
+      let bars = '', labels = '';
+      for (let s = 1; s <= 5; s++) {
+        let cls = 'bg-line';
+        if (status === 'completed' || s < curStep) cls = 'bg-ink';
+        else if (s === curStep && (status === 'running' || status === 'waiting_human')) cls = 'seg-active';
+        else if (s === curStep && status === 'error') cls = 'bg-red-500';
+        bars += `<div class="h-1.5 flex-1 rounded-full transition-colors duration-500 ${cls}" title="Step ${s}"></div>`;
+        labels += `<div class="flex-1 ${s === curStep ? 'text-ink' : ''}">${names[s - 1]}</div>`;
+      }
+      return `<div class="flex gap-1">${bars}</div><div class="flex gap-1 mt-1.5 text-[10px] font-mono text-mute">${labels}</div>`;
+    }
+
+    function renderAccounts(accounts) {
+      const list = $('accountsTbody');
+      const active = document.activeElement;
+      if (active && active.tagName === 'SELECT' && list.contains(active)) return;
+
+      if (!accounts.length) {
+        list.innerHTML = `<div class="py-16 text-center">
+          <div class="font-display italic text-3xl text-mute">Nothing here yet.</div>
+          <p class="text-sm text-mute mt-2">Paste your accounts in the Import box above to start.</p></div>`;
+        return;
+      }
+
+      list.innerHTML = accounts.map(acc => {
+        const savedStart = selectedStartSteps[acc.id] || 1;
+        const isNew = !seenRows.has(acc.id);
+        seenRows.add(acc.id);
+        const exp = acc.expiry_date || '';
+        const goodExp = exp.includes('2027年10月') || exp.includes('2027年11月') || exp.includes('2028');
+
+        const totpHtml = (acc.totp_secret && acc.totp_now && acc.totp_now !== '------')
+          ? `<button class="group text-left" onclick="copyText('${acc.totp_now}')" title="Click to copy">
+               <span class="font-mono text-base tracking-[0.2em] group-hover:text-accent transition-colors">${acc.totp_now}</span>
+               <span class="block h-0.5 w-20 bg-line rounded-full mt-1 overflow-hidden"><span class="block h-full bg-ink transition-all duration-1000" style="width:${(acc.totp_rem / 30) * 100}%"></span></span>
+               <span class="text-[10px] text-mute font-mono">${acc.totp_rem}s left</span>
+             </button>`
+          : `<span class="text-xs text-mute">Recovery email</span>`;
+
+        const netTag = acc.ip_info
+          ? `<span class="text-mute">${escapeHtml(acc.ip_info)}</span>`
+          : (acc.proxy ? `<span class="text-accent">Own proxy</span>` : '');
+
+        return `
+          <div class="${isNew ? 'row-in' : ''} border-b border-line py-5 hover:border-mute/40 transition-colors">
+            <div class="grid grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_140px_130px_minmax(0,1.6fr)_150px] gap-x-6 gap-y-4 items-start">
+              <div class="col-span-2 lg:col-span-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-[11px] text-mute">${acc.id}</span>
+                  ${netTag ? `<span class="font-mono text-[11px]">· ${netTag}</span>` : ''}
+                </div>
+                <div class="font-medium truncate mt-0.5">${escapeHtml(acc.email)}</div>
+                <div class="font-mono text-[11px] text-mute mt-1 break-all">
+                  ${escapeHtml(acc.password || '')}${acc.recovery_email ? ` · ${escapeHtml(acc.recovery_email)}` : ''}
+                </div>
+              </div>
+              <div><span class="lbl lg:hidden">Verification</span>${totpHtml}</div>
+              <div><span class="lbl lg:hidden">Status</span>${statusBadgeHtml(acc.status)}</div>
+              <div class="col-span-2 lg:col-span-1 min-w-0">
+                <span class="lbl lg:hidden">Progress</span>
+                ${stepDotsHtml(acc.current_step || 0, acc.status)}
+                <div class="text-xs text-mute mt-2 break-words">${escapeHtml(acc.step_message || '')}</div>
+              </div>
+              <div class="col-span-2 lg:col-span-1">
+                <span class="lbl lg:hidden">Expires</span>
+                <span class="text-sm font-medium ${goodExp ? 'text-emerald-700' : ''}">${escapeHtml(exp || '—')}</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mt-4">
+              <select class="field !w-auto !py-1.5 !text-xs" onchange="selectedStartSteps['${acc.id}'] = parseInt(this.value)">
+                <option value="1" ${savedStart === 1 ? 'selected' : ''}>From step 1 · full run</option>
+                <option value="2" ${savedStart === 2 ? 'selected' : ''}>From step 2 · 12M</option>
+                <option value="3" ${savedStart === 3 ? 'selected' : ''}>From step 3 · +6M</option>
+                <option value="4" ${savedStart === 4 ? 'selected' : ''}>From step 4 · +6M cap</option>
+                <option value="5" ${savedStart === 5 ? 'selected' : ''}>From step 5 · cancel</option>
+              </select>
+              <button class="btn btn-sm ${acc.is_running ? 'btn-red' : 'btn-ink'}"
+                onclick="${acc.is_running ? `stopSingle('${acc.id}')` : `runSingle('${acc.id}')`}">
+                ${acc.is_running ? 'Stop' : 'Run'}
+              </button>
+              <button class="btn btn-sm btn-line" onclick="openBrowser('${acc.id}')" title="Open this account's Chrome window">
+                ${openedBrowserMap[acc.id] ? 'Opened ✓' : 'Browser'}
+              </button>
+              ${acc.last_screenshot ? `<button class="btn btn-sm btn-line" onclick="showScreenshot('${acc.id}', '${acc.last_screenshot}')">Screenshot</button>` : ''}
+              <button class="btn btn-sm btn-line" onclick="copyAccountFull('${acc.id}', '${acc.email}', '${acc.password}', '${acc.totp_secret || acc.recovery_email || ''}')">
+                ${copiedAccountMap[acc.id] ? 'Copied ✓' : 'Copy'}
+              </button>
+              <span class="flex-1"></span>
+              <button class="btn btn-sm text-mute hover:text-ink" onclick="openEdit('${acc.id}')" title="Edit email & password" ${acc.is_running ? 'disabled' : ''}>Edit</button>
+              <button class="btn btn-sm text-mute hover:text-ink" onclick="resetAccount('${acc.id}')" title="Reset to pending">Reset</button>
+              <button class="btn btn-sm text-mute hover:text-red-700" onclick="deleteAccount('${acc.id}')" title="Remove account">Delete</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function renderLogs(logs) {
+      const term = $('logTerminal');
+      const isAtBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 40;
+      if (!logs.length) {
+        term.innerHTML = '<div class="text-mute">Waiting for activity…</div>';
+        return;
+      }
+      term.innerHTML = logs.map((line, i) => {
+        let cls = 'text-ink/75';
+        if (line.includes('⚠️') || line.includes('人机验证') || /warn/i.test(line)) cls = 'text-amber-700';
+        else if (line.includes('❌') || line.includes('异常') || /error|fail/i.test(line)) cls = 'text-red-600';
+        else if (line.includes('✅') || line.includes('🎉')) cls = 'text-emerald-700';
+        return `<div class="flex gap-4"><span class="text-mute/40 select-none w-8 shrink-0 text-right">${i + 1}</span><span class="${cls} whitespace-pre-wrap break-all">${escapeHtml(line)}</span></div>`;
+      }).join('');
+      if (isAtBottom) term.scrollTop = term.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function onRegionChange() {
+      $('cfgAddr').value = '700 SW 5th Ave';
+      $('cfgZip').value = '97201';
+      $('cfgProvince').value = 'OR';
+    }
+
+    async function testProxyNow() {
+      const btn = $('btnTestProxy');
+      const box = $('proxyTestResult');
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      box.className = 'text-xs mt-2 text-blue-700';
+      box.textContent = 'Testing proxy connection…';
+      try {
+        const res = await fetch('/api/proxy/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_region: $('cfgTargetRegion').value, proxy_template: $('cfgProxyTemplate').value.trim() })
+        });
+        const data = await res.json();
+        box.className = `text-xs mt-2 ${data.ok ? 'text-emerald-700' : 'text-red-600'}`;
+        box.textContent = (data.ok ? '✓ ' : '✕ ') + data.message;
+      } catch (e) {
+        box.className = 'text-xs mt-2 text-red-600';
+        box.textContent = '✕ Request failed: ' + e;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Test proxy';
+        fetchState();
+      }
+    }
+
+    async function saveConfig(notify = false) {
+      const payload = {
+        target_region: $('cfgTargetRegion').value || 'US',
+        target_plan: $('cfgTargetPlan').value || 'pro_2year_zero',
+        auto_cancel: $('cfgAutoCancel').checked,
+        proxy_template: $('cfgProxyTemplate').value.trim(),
+        card: {
+          number: $('cfgCardNumber').value.replace(/\s+/g, ''),
+          exp_month: $('cfgExpMonth').value.trim(),
+          exp_year: $('cfgExpYear').value.trim(),
+          cvc: $('cfgCvc').value.trim(),
+          holder: $('cfgHolder').value.trim().toUpperCase(),
+          address_line1: $('cfgAddr').value.trim() || '700 SW 5th Ave',
+          postal_code: $('cfgZip').value.trim() || '97201',
+          locality: 'Portland',
+          province: $('cfgProvince').value.trim().toUpperCase() || 'OR'
+        }
+      };
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (notify) toast(res.ok ? 'Configuration saved' : 'Failed to save configuration', res.ok ? 'green' : 'red');
+      fetchState();
+    }
+
+    async function importAccounts() {
+      const raw = $('importText').value.trim();
+      if (!raw) return toast('Paste some accounts first', 'red');
+      const res = await fetch('/api/accounts/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: raw })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        $('importText').value = '';
+        toast('Accounts imported', 'green');
+        fetchState();
+      } else {
+        toast(data.message || 'Import failed', 'red');
+      }
+    }
+
+    function validateCardBeforeRun(startStep) {
+      if (startStep > 4) return true;
+      const num = $('cfgCardNumber').value.replace(/\s+/g, '');
+      if (num.length < 12 || !$('cfgExpMonth').value.trim() || !$('cfgExpYear').value.trim() || !$('cfgCvc').value.trim()) {
+        toast('Fill in card number, expiry and CVC before running', 'red');
+        $('cfgCardNumber').focus();
+        return false;
+      }
+      return true;
+    }
+
+    async function runSingle(accountId) {
+      const startStep = selectedStartSteps[accountId] || 1;
+      if (!validateCardBeforeRun(startStep)) return;
+      await saveConfig();
+      const res = await fetch('/api/run/single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId, start_step: startStep })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast(err.detail || 'Failed to start', 'red');
+      }
+      fetchState();
+    }
+
+    async function runBatch() {
+      const startStep = parseInt($('batchStartStep').value || '1');
+      if (!validateCardBeforeRun(startStep)) return;
+      await saveConfig();
+      const res = await fetch('/api/run/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_step: startStep })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast(err.detail || 'Failed to start queue', 'red');
+      } else {
+        toast('Queue started', 'green');
+      }
+      fetchState();
+    }
+
+    async function stopSingle(accountId) {
+      await fetch('/api/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId })
+      });
+      fetchState();
+    }
+
+    async function stopAll() {
+      await fetch('/api/stop', { method: 'POST' });
+      toast('Stopping all tasks');
+      fetchState();
+    }
+
+    async function openBrowser(accountId) {
+      openedBrowserMap[accountId] = true;
+      fetchState();
+      await fetch('/api/open_browser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId })
+      });
+      setTimeout(() => { delete openedBrowserMap[accountId]; fetchState(); }, 2500);
+    }
+
+    async function resetAccount(accountId) {
+      await fetch('/api/accounts/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId })
+      });
+      fetchState();
+    }
+
+    async function deleteAccount(accountId) {
+      if (!confirm(`Remove ${accountId} from the list?`)) return;
+      await fetch('/api/accounts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId })
+      });
+      seenRows.delete(accountId);
+      fetchState();
+    }
+
+    function showScreenshot(accId, filename) {
+      $('modalTitle').textContent = `${accId} · ${filename}`;
+      $('modalImg').src = `/screenshots/${filename}?t=${Date.now()}`;
+      $('imgModal').classList.replace('hidden', 'flex');
+      $('modalBox').classList.remove('modal-in');
+      void $('modalBox').offsetWidth;
+      $('modalBox').classList.add('modal-in');
+    }
+
+    function closeModal() {
+      $('imgModal').classList.replace('flex', 'hidden');
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEdit(); } });
+
+    function openEdit(accId) {
+      const acc = accountMap[accId];
+      if (!acc) return;
+      editingId = accId;
+      $('editId').textContent = accId;
+      $('editEmail').value = acc.email || '';
+      $('editPassword').value = acc.password || '';
+      $('editPassword').type = 'password';
+      $('editPwToggle').textContent = 'Show';
+      $('editRecovery').value = acc.recovery_email || '';
+      $('editTotp').value = acc.totp_secret || '';
+      $('editProxy').value = acc.proxy || '';
+      $('editModal').classList.replace('hidden', 'flex');
+      $('editBox').classList.remove('modal-in');
+      void $('editBox').offsetWidth;
+      $('editBox').classList.add('modal-in');
+      setTimeout(() => $('editEmail').focus(), 50);
+    }
+
+    function closeEdit() {
+      editingId = null;
+      $('editModal').classList.replace('flex', 'hidden');
+    }
+
+    function togglePw() {
+      const show = $('editPassword').type === 'password';
+      $('editPassword').type = show ? 'text' : 'password';
+      $('editPwToggle').textContent = show ? 'Hide' : 'Show';
+    }
+
+    async function saveEdit(e) {
+      e.preventDefault();
+      if (!editingId) return;
+      $('editSave').disabled = true;
+      try {
+        const res = await fetch('/api/accounts/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account_id: editingId,
+            email: $('editEmail').value.trim(),
+            password: $('editPassword').value,
+            recovery_email: $('editRecovery').value.trim(),
+            totp_secret: $('editTotp').value.trim(),
+            proxy: $('editProxy').value.trim()
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) return toast(data.detail || 'Failed to update account', 'red');
+        toast('Account updated', 'green');
+        closeEdit();
+        fetchState();
+      } finally {
+        $('editSave').disabled = false;
+      }
+    }
+
+    function copyText(txt) {
+      navigator.clipboard.writeText(txt);
+      toast('Code copied');
+    }
+
+    function copyAccountFull(accId, email, password, totpSecret) {
+      navigator.clipboard.writeText(`${email}----${password}----${totpSecret}`);
+      copiedAccountMap[accId] = true;
+      fetchState();
+      setTimeout(() => { delete copiedAccountMap[accId]; fetchState(); }, 2000);
+    }
+
+    fetchState();
+    setInterval(fetchState, 1500);
+  </script>
+</body>
+</html>
