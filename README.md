@@ -1,5 +1,7 @@
 # Google AI Pro (5 TB) // 2-Year Zero-Cost Automation Console
 
+![Google AI Pro Automation Console](img/image-1.png)
+
 > [!WARNING]
 > **Educational & Research Purpose Only**  
 > This project is provided strictly for educational, learning, and browser automation research purposes. Do not use this tool for commercial abuse or violating service terms. You are solely responsible for how you use this software.
