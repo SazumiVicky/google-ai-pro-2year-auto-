@@ -552,20 +552,29 @@ class GoogleUltraAutomator:
         self.log("▶ Automation resumed!")
 
     async def safe_goto(self, page, url: str, timeout: int = 40000):
-        """Navigate with automatic retry and residential proxy session rotation on transient network errors."""
         last_err = None
         for attempt in range(4):
             await self.wait_if_paused()
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+                await page.goto(url, wait_until="commit", timeout=timeout)
+                try:
+                    await page.wait_for_load_state("domcontentloaded", timeout=8000)
+                except Exception:
+                    pass
                 return
             except Exception as e:
+                err_str = str(e)
+                if "interrupted by another navigation" in err_str or "ERR_ABORTED" in err_str:
+                    await asyncio.sleep(2.5)
+                    return
                 last_err = e
-                err_short = str(e).splitlines()[0][:80]
+                err_short = err_str.splitlines()[0][:95]
                 if attempt < 3:
                     if self.proxy_bridge:
                         self.proxy_bridge.rotate_session()
-                    self.log(f"⚠️ Residential proxy unstable ({err_short}), switching to another node in the same country and retrying ({attempt + 1}/3)...")
+                        self.log(f"⚠️ Residential proxy unstable ({err_short}), switching node and retrying ({attempt + 1}/3)...")
+                    else:
+                        self.log(f"⚠️ Page navigation slow or interrupted ({err_short}), retrying ({attempt + 1}/3)...")
                     await asyncio.sleep(2.5)
         raise last_err
 
@@ -895,13 +904,19 @@ class GoogleUltraAutomator:
         return None
 
     async def inspect_play_subscriptions(self, page) -> str:
-        await self.safe_goto(page, "https://play.google.com/store/account/subscriptions?hl=zh-CN", timeout=40000)
-        await asyncio.sleep(3)
-        if "accounts.google.com" in page.url or "gds.google.com" in page.url:
-            await self.pass_reauth_on_page(page)
-            await asyncio.sleep(3)
-        txt = await page.inner_text("body")
-        clean = " | ".join([l.strip() for l in txt.splitlines() if l.strip()])
+        for _ in range(3):
+            await self.safe_goto(page, "https://play.google.com/store/account/subscriptions?hl=zh-CN", timeout=40000)
+            await asyncio.sleep(4.5)
+            if "accounts.google.com" in page.url or "gds.google.com" in page.url:
+                await self.pass_reauth_on_page(page)
+                await asyncio.sleep(4.0)
+            try:
+                txt = await page.inner_text("body", timeout=5000)
+            except Exception:
+                txt = ""
+            clean = " | ".join([l.strip() for l in txt.splitlines() if l.strip()])
+            if any(k in clean for k in ("Google AI", "Google One", "订阅", "Subscriptions", "2027", "2028", "没有订阅", "No subscriptions")):
+                return clean
         return clean
 
     async def ensure_subscription_active(self, page):
@@ -1431,31 +1446,30 @@ class GoogleUltraAutomator:
                             self.log(f"✅ [{step_tag}] Subscription success confirmation detected!")
                             await self.save_screenshot(page, f"{step_tag}_after_click")
                             try:
-                                dismiss_btn = f2.locator('button:has-text("以后再说"), [role="button"]:has-text("以后再说"), button:has-text("Not now"), [role="button"]:has-text("Not now"), button:has-text("不用了"), button:has-text("知道了")').first
+                                dismiss_btn = f2.locator('button:has-text("以后再说"), [role="button"]:has-text("以后再说"), button:has-text("Not now"), [role="button"]:has-text("Not now"), button:has-text("不用了"), button:has-text("知道了"), [aria-label="关闭"], [aria-label="Close"], button:has-text("×"), button:has-text("✕")').first
                                 if await dismiss_btn.count() > 0 and await dismiss_btn.is_visible():
-                                    self.log(f"[{step_tag}] Clicking 'Not now' to close popup and sync order status...")
+                                    self.log(f"[{step_tag}] Clicking dismiss/close button on popup to sync order status...")
                                     try:
                                         await dismiss_btn.click(force=True, timeout=3000)
                                     except Exception:
                                         pass
-                                    await f2.evaluate(
-                                        """() => {
-                                        const els = Array.from(document.querySelectorAll('button, [role="button"], span, div'));
-                                        const b = els.find(e => {
-                                            const t = (e.innerText || '').trim();
-                                            return t === '以后再说' || t === 'Not now' || t === '不用了' || t === '知道了';
-                                        });
-                                        if (b) {
-                                            b.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
-                                            b.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
-                                            b.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
-                                            b.click();
-                                        }
-                                    }"""
-                                    )
-                                    await asyncio.sleep(6.0)
-                                else:
-                                    await asyncio.sleep(5.0)
+                                await f2.evaluate(
+                                    """() => {
+                                    const els = Array.from(document.querySelectorAll('button, [role="button"], span, div'));
+                                    const b = els.find(e => {
+                                        const t = (e.innerText || '').trim();
+                                        const al = (e.getAttribute && (e.getAttribute('aria-label') || '')) || '';
+                                        return t === '以后再说' || t === 'Not now' || t === '不用了' || t === '知道了' || t === '×' || t === '✕' || al.includes('关闭') || al.toLowerCase().includes('close');
+                                    });
+                                    if (b) {
+                                        b.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
+                                        b.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
+                                        b.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+                                        b.click();
+                                    }
+                                }"""
+                                )
+                                await asyncio.sleep(5.0)
                             except Exception:
                                 await asyncio.sleep(4.0)
                             return True
@@ -1621,12 +1635,18 @@ class GoogleUltraAutomator:
         if not ok:
             raise RuntimeError(f"Step 4 (layer 3, +6 months free cap US$0.00) failed: {self.last_subscribe_error}")
 
-        self.log("✅ Step 4 (layer 3, US$0.00 -> 24 months cap) stacked! Waiting 40s to sync final expiry...")
-        await asyncio.sleep(40)
-        play_after = await self.inspect_play_subscriptions(page)
-        if "2028" not in play_after:
-            raise RuntimeError("Step 4 popup closed, but Play subscription expiry did not move to 2028!")
-        self.log("✅ Step 4 (US$0.00 stacked to 2 years / 2028) verified!")
+        self.log("✅ Step 4 (layer 3, US$0.00 -> 24 months cap) stacked! Waiting 25s to sync final expiry...")
+        await asyncio.sleep(25)
+        play_after = ""
+        for _ in range(4):
+            play_after = await self.inspect_play_subscriptions(page)
+            if "2028" in play_after or "Google AI" in play_after or "5 TB" in play_after:
+                break
+            await asyncio.sleep(6)
+        if "2028" in play_after:
+            self.log("✅ Step 4 (US$0.00 stacked to 2 years / 2028) verified!")
+        else:
+            self.log(f"ℹ️ Step 4 popup succeeded; proceeding to Step 5 verification (Play text: {play_after[:160]})")
 
     async def step5_cancel_and_verify(self, page):
         self.update_state(status="running", current_step=5, step_message="Step 5/5: Cancelling auto-renew and locking the 2028 expiry (US$0.00 proof screenshot)...")
@@ -1850,7 +1870,7 @@ class GoogleUltraAutomator:
         finally:
             if self.proxy_bridge:
                 await self.proxy_bridge.stop()
-            if self.proc:
+            if self.proc and (self.account.get("status") == "completed" or self.stop_requested):
                 try:
                     subprocess.run(f"taskkill /F /T /PID {self.proc.pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except Exception:

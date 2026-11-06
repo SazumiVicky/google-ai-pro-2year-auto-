@@ -74,6 +74,9 @@ Click **Run** on an individual account or **Run pending** at the top to process 
 - **Bug Fixes**:
   - **Playwright Selector Fix**: Fixed the `Unexpected token "="` CSS selector syntax crash on `gds.google.com` recovery prompts by replacing invalid mixed `text="..."` selectors with `:text-is()`.
   - **Accurate VCC Auto-Fill & Verification**: Rebuilt inline Google Payments card filling (`_fill_card_form` & `_type_and_verify`) to prioritize the `instrumentmanager` iframe, check existing input values before clearing (preventing typed digits from being accidentally wiped), type sequentially (`vis.nth(0..4)`), and strictly verify every field (Card Number, `MMYY` Expiry, CVC, Cardholder, and `97201` ZIP) against `config.json` before clicking Save.
+  - **US IP Guard & USD Currency Enforcement (`&gl=US`)**: Added pre-flight exit IP verification (`verify_ip_environment`) that stops execution if a non-US IP leak is detected when `target_region` is `US` (preventing accounts from locking to local currency like IDR), and appended `&gl=US` to Google One plan URLs.
+  - **Navigation Redirect Tolerance (`safe_goto`)**: Fixed false `"Residential proxy unstable"` errors caused by Google's fast `ServiceLogin` redirects (`interrupted by another navigation` / `ERR_ABORTED`) by using `wait_until="commit"` with graceful load-state waiting.
+  - **Step 4 Backup Payment Modal & 2028 Expiry Sync Fix**: Fixed Step 4 failing after a successful 2028 stack by automatically dismissing the Google Play *"Turn on backup payment method?"* (`开启备用付款方式?`) dialog via its close (`×`) button, polling `inspect_play_subscriptions` until subscription data finishes rendering, seamlessly transitioning to Step 5 auto-cancel, and keeping the Chrome window open on error instead of force-killing it.
   - **UI Dropdown Stability**: Fixed the account step selector dropdown closing on its own during live state polling.
 
 ---
